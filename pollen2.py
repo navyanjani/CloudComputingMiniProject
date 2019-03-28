@@ -13,7 +13,7 @@ from cassandra.cluster import Cluster
 app = Flask(__name__,instance_relative_config=True)
 # app.config.from_object('config')
 app.config.from_pyfile('config.py')
-
+#cassandra
 cluster = Cluster(['cassandra'])
 session = cluster.connect()
 
@@ -70,4 +70,3 @@ def dbQuerying():
 
 if __name__ =="__main__":
     app.run(host='0.0.0.0',port=8080)
-
