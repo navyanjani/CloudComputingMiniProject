@@ -1,3 +1,4 @@
+### Pollan app using Cassandra
 This application will provide Pollen indexes forecasted in an hourly fashion for the location specified in the flask application as latitude and longitude.
 The API is provide by api.breezometer.com
 
@@ -113,12 +114,16 @@ gcloud container clusters create cassandra --num-nodes=3 --machine-type "n1-stan
 
 
 wget -O cassandra-peer-service.yml http://tinyurl.com/yyxnephy
+
 wget -O cassandra-service.yml http://tinyurl.com/y65czz8e
+
 wget -O cassandra-replication-controller.yml http://tinyurl.com/y2crfsl8
 
 ## Once these are downloaded we can now run our three components:
 kubectl create -f cassandra-peer-service.yml
+
 kubectl create -f cassandra-service.yml
+
 kubectl create -f cassandra-replication-controller.yml
 
 ## Check that the single container is running correctly:
@@ -142,10 +147,15 @@ CREATE TABLE pollendata.pollenvalue (Time float, Grass Boolean, Tree Boolean, We
 ## Now run the following commands
 
 export PROJECT_ID="$(gcloud config get-value project -q)"
+
 docker build -t gcr.io/${PROJECT_ID}/pollen:v1 .
+
 docker push gcr.io/${PROJECT_ID}/pollen:v1
+
 kubectl run pollen --image=gcr.io/${PROJECT_ID}/pollen:v1 --port 8080
+
 kubectl expose deployment pollen --type=LoadBalancer --port 80 --target-port 8080
+
 kubectl get services
 
 ### Now we can see the external IP along with Load balance
