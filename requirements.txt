@@ -3,3 +3,4 @@ requests
 json2html
 cassandra-driver
 flask-cassandra
+pip
