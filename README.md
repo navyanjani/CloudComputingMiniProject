@@ -28,10 +28,6 @@ and reducing latency.
 
 Popular open stacks on Kubernetes packaged by Google.
 
-## Design
-
-![Architecture diagram](resources/cassandra-k8s-app-architecture.png)
-
 ### Solution Information
 
 StatefulSet Kubernetes object is used to manage all Cassandra pods within this K8s application. Each pod runs a single instance of Cassandra process.
@@ -91,152 +87,65 @@ Configure `kubectl` to connect to the new cluster:
 ```shell
 gcloud container clusters get-credentials "$CLUSTER" --zone "$ZONE"
 ```
+## Export the project using Project ID
+export PROJECT_ID="$(gcloud config get-value project -q)"
 
-#### Clone this repo
+## pull the project
+docker pull cassandra:latest
 
-Clone this repo and the associated tools repo.
+# Run
+docker run --name cassandra-test -d cassandra:latest
 
-```shell
-git clone --recursive https://github.com/GoogleCloudPlatform/click-to-deploy.git
-```
+## Activate the cqlsh
+docker exec -it cassandra-test cqlsh
 
+## After activation create the keyspace
+CREATE KEYSPACE pollendata WITH REPLICATION =
+{'class' : 'SimpleStrategy', 'replication_factor' : 2};
 
-### Install the Application
+## Create the table
+CREATE TABLE pollendata.pollenvalue (Time float, Grass Boolean, Tree Boolean, Weed Boolean,PRIMARY KEY(Time));
 
-Navigate to the `cassandra` directory:
+### Now create the c3 nodes cluster named cassandra
+gcloud container clusters create cassandra --num-nodes=3 --machine-type "n1-standard-2"
 
-```shell
-cd click-to-deploy/k8s/cassandra
-```
-
-#### Configure the app with environment variables
-
-Choose an instance name and
-[namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
-for the app. In most cases, you can use the `default` namespace.
-
-```shell
-export APP_INSTANCE_NAME=cassandra-1
-export NAMESPACE=default
-```
-
-Set the number of replicas for Cassandra:
-
-```shell
-# Setting a single node in Cassandra cluster means single point of failure.
-# For production environments, consider at least 3 replicas.
-export REPLICAS=3
-```
-
-Enable Stackdriver Metrics Exporter:
-
-> **NOTE:** Your GCP project should have Stackdriver enabled. For non-GCP clusters, export of metrics to Stackdriver is not supported yet.
-By default the integration is disabled. To enable, change the value to `true`.
-
-```shell
-export METRICS_EXPORTER_ENABLED=false
-```
-
-Configure the container images:
-
-```shell
-TAG=3.11
-export IMAGE_CASSANDRA="marketplace.gcr.io/google/cassandra:${TAG}"
-export IMAGE_METRICS_EXPORTER="marketplace.gcr.io/google/cassandra/prometheus-to-sd:${TAG}"
-```
-
-The images above are referenced by
-[tag](https://docs.docker.com/engine/reference/commandline/tag). We recommend
-that you pin each image to an immutable
-[content digest](https://docs.docker.com/registry/spec/api/#content-digests).
-This ensures that the installed application always uses the same images,
-until you are ready to upgrade. To get the digest for the image, use the
-following script:
-
-```shell
-for i in "IMAGE_CASSANDRA" "IMAGE_METRICS_EXPORTER"; do
-  repo=$(echo ${!i} | cut -d: -f1);
-  digest=$(docker pull ${!i} | sed -n -e 's/Digest: //p');
-  export $i="$repo@$digest";
-  env | grep $i;
-done
-```
-
-#### Create namespace in your Kubernetes cluster
-
-If you use a different namespace than the `default`, run the command below to create a new namespace:
-
-```shell
-kubectl create namespace "$NAMESPACE"
-```
-
-#### Expand the manifest template
-
-Use `helm template` to expand the template. We recommend that you save the
-expanded manifest file for future updates to the application.
-
-```shell
-helm template chart/cassandra \
-  --name $APP_INSTANCE_NAME \
-  --namespace $NAMESPACE \
-  --set cassandra.image=$IMAGE_CASSANDRA \
-  --set cassandra.replicas=$REPLICAS \
-  --set metrics.image=$IMAGE_METRICS_EXPORTER \
-  --set metrics.enabled=$METRICS_EXPORTER_ENABLED > "${APP_INSTANCE_NAME}_manifest.yaml"
-```
-
-#### Apply the manifest to your Kubernetes cluster
-
-Use `kubectl` to apply the manifest to your Kubernetes cluster:
-
-```shell
-kubectl apply -f "${APP_INSTANCE_NAME}_manifest.yaml" --namespace "${NAMESPACE}"
-```
-
-#### View the app in the Google Cloud Console
-
-To get the Console URL for your app, run the following command:
-
-```shell
-echo "https://console.cloud.google.com/kubernetes/application/${ZONE}/${CLUSTER}/${NAMESPACE}/${APP_INSTANCE_NAME}"
-```
-
-To view your app, open the URL in your browser.
-
-### Check the status of the Cassandra cluster
-
-If your deployment is successful, you can check status of your Cassandra
-cluster.
-
-On one of the Cassandra containers, run the `nodetool status` command.
-`nodetool` is a Cassandra utility for managing a cluster. It is part of
-the Cassandra container image.
-
-```shell
-kubectl exec "${APP_INSTANCE_NAME}-cassandra-0" --namespace "${NAMESPACE}" -c cassandra -- nodetool status
-```
+## The first will be a Headless service which will allow peer discovery i.e. the Cassandra pods will be able to find each other and form a ring.The second defines the Cassandra service itself, and the third is a Replication Controller which allows us to scale up and down the number of containers we want. Download these via the following commands:
 
 
-#### Get the IP address of the Service
+wget -O cassandra-peer-service.yml http://tinyurl.com/yyxnephy
+wget -O cassandra-service.yml http://tinyurl.com/y65czz8e
+wget -O cassandra-replication-controller.yml http://tinyurl.com/y2crfsl8
 
-Get the external IP address of the Cassandra service using the following
-command:
+## Once these are downloaded we can now run our three components:
+kubectl create -f cassandra-peer-service.yml
+kubectl create -f cassandra-service.yml
+kubectl create -f cassandra-replication-controller.yml
 
-```shell
-CASSANDRA_IP=$(kubectl get svc $APP_INSTANCE_NAME-cassandra-external-svc \
-  --namespace $NAMESPACE \
-  --output jsonpath='{.status.loadBalancer.ingress[0].ip}')
+## Check that the single container is running correctly:
+kubectl get pods -l name=cassandra
+## and if so we can can scale up our number of nodes via our replication-controller:
+kubectl scale rc cassandra --replicas=3
 
-echo $CASSANDRA_IP
-```
+## Pick one of your containers, we must now check that the ring has been formed between all of the Cassandra instances:
+kubectl exec -it cassandra-fwcxr -- nodetool status
 
-Connect `cqlsh` to the external IP address, using the following command:
+## Now activate kubectl 
+kubectl exec -it cassandra-fwcxr cqlsh
 
-```shell
-CQLSH_HOST=$CASSANDRA_IP cqlsh --cqlversion=3.4.4
+## Create keyspace with replication
+CREATE KEYSPACE pollendata WITH REPLICATION =
+{'class' : 'SimpleStrategy', 'replication_factor' : 2};
 
+## Create table inside kubernetes
+CREATE TABLE pollendata.pollenvalue (Time float, Grass Boolean, Tree Boolean, Weed Boolean,PRIMARY KEY(Time));
 
-## Contributing
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+## Now run the following commands
 
-Please make sure to update tests as appropriate.
+export PROJECT_ID="$(gcloud config get-value project -q)"
+docker build -t gcr.io/${PROJECT_ID}/pollen:v1 .
+docker push gcr.io/${PROJECT_ID}/pollen:v1
+kubectl run pollen --image=gcr.io/${PROJECT_ID}/pollen:v1 --port 8080
+kubectl expose deployment pollen --type=LoadBalancer --port 80 --target-port 8080
+kubectl get services
+
+### Now we can see the external IP along with Load balance
