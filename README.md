@@ -1,12 +1,12 @@
 This application will provide Pollen indexes forecasted in an hourly fashion for the location specified in the flask application as latitude and longitude.
 The API is provide by api.breezometer.com
 
-##About:
+## About:
 A python flask based web app leveraging on google cloud and kubernetes engine. The app is implements Pollen API lets you request pollen information including types, plants, and indexes for a specific location. The API provides endpoints that let you query. 
 1) Current Conditions
 2) Daily Forecast
 
-##Running the application:
+## Running the application:
 The following fields have to be edited for the need latitude, longitude, start time, end time, api key
 
 ##How To Install and Run the Project :
@@ -81,7 +81,7 @@ Create a new cluster from the command line:
 
 ```shell
 export CLUSTER=cassandra-cluster
-export ZONE=us-west1-a
+gcloud config set compute/zone europe-west2-b
 
 gcloud container clusters create "$CLUSTER" --zone "$ZONE"
 ```
@@ -100,23 +100,6 @@ Clone this repo and the associated tools repo.
 git clone --recursive https://github.com/GoogleCloudPlatform/click-to-deploy.git
 ```
 
-#### Install the Application resource definition
-
-An Application resource is a collection of individual Kubernetes components,
-such as Services, Deployments, and so on, that you can manage as a group.
-
-To set up your cluster to understand Application resources, run the following command:
-
-```shell
-kubectl apply -f "https://raw.githubusercontent.com/GoogleCloudPlatform/marketplace-k8s-app-tools/master/crd/app-crd.yaml"
-```
-
-You need to run this command once.
-
-The Application resource is defined by the
-[Kubernetes SIG-apps](https://github.com/kubernetes/community/tree/master/sig-apps)
-community. The source code can be found on
-[github.com/kubernetes-sigs/application](https://github.com/kubernetes-sigs/application).
 
 ### Install the Application
 
@@ -233,52 +216,6 @@ the Cassandra container image.
 kubectl exec "${APP_INSTANCE_NAME}-cassandra-0" --namespace "${NAMESPACE}" -c cassandra -- nodetool status
 ```
 
-### Connecting to Cassandra (internal access)
-
-You can connect to the Cassandra service without exposing your cluster
-for public access, using the following options:
-
-*  From a container in your Kubernetes cluster, connect using the hostname
-  `$APP_INSTANCE_NAME-cassandra-0.$APP_INSTANCE_NAME-cassandra-svc.$NAMESPACE.svc.cluster.local`
-
-* Use port forwarding to access the service. In a separate terminal, run the
-  following command:
-
-    ```shell
-    kubectl port-forward "${APP_INSTANCE_NAME}-cassandra-0" 9042:9042 --namespace "${NAMESPACE}"
-    ```
-
-    Then, in your main terminal, start `cqlsh`:
-
-    ```shell
-    cqlsh --cqlversion=3.4.4
-    ```
-
-    In the response, you see the Cassandra welcome message:
-
-    ```shell
-    Use HELP for help.
-    cqlsh>
-    ```
-
-### Connecting to Cassandra using an external IP address
-
-By default, the application does not have an external IP address.
-
-If you want to expose your Cassandra cluster using an external IP address,
-first [configure access control](https://www.datastax.com/dev/blog/role-based-access-control-in-cassandra).
-
-#### Configuring the Cassandra service
-
-To configure Cassandra as an external service, run the following command:
-
-```shell
-envsubst '${APP_INSTANCE_NAME}' < scripts/external.yaml.template > scripts/external.yaml
-kubectl apply -f scripts/external.yaml --namespace "${NAMESPACE}"
-```
-
-An external IP address is provisioned for the Service. It might take
-a few minutes to get the external IP address.
 
 #### Get the IP address of the Service
 
@@ -299,7 +236,7 @@ Connect `cqlsh` to the external IP address, using the following command:
 CQLSH_HOST=$CASSANDRA_IP cqlsh --cqlversion=3.4.4
 
 
-Contributing
+## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
 Please make sure to update tests as appropriate.
